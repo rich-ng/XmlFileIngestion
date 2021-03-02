@@ -1,0 +1,28 @@
+:auto USING PERIODIC
+COMMIT LOAD CSV WITH HEADERS FROM 'file:///files.csv' AS line
+CREATE (:File {assetId: line.AssetId, fileType: line.FileType, bucketName: line.BucketName, s3Key: line.Key})
+
+CREATE INDEX FOR (f:File) ON (f.assetId)
+
+:auto USING PERIODIC
+COMMIT LOAD CSV WITH HEADERS FROM 'file:///attributes.csv' AS line
+CREATE (:Attribute {name: line.Key, value: COALESCE(line.Value, "")})
+
+CREATE INDEX FOR (a:Attribute) ON (a.name, a.value)
+
+:auto USING PERIODIC
+COMMIT LOAD CSV WITH HEADERS FROM 'file:///nodes.csv' AS line
+MATCH (f:File{assetId: line.AssetId})
+CREATE (f)-[:HAS_NODE]->(:Node {nodeId: line.NodeId, name: line.Name, XPath: line.XPath, hasText: line.HasText})
+
+CREATE INDEX FOR (n:Node) ON (n.nodeId)
+
+:auto USING PERIODIC COMMIT
+LOAD CSV WITH HEADERS FROM 'file:///nodeAttributes.csv' AS line
+MATCH (n:Node{nodeId: line.NodeId}), (a:Attribute{name: line.AttributeName, value: COALESCE(line.AttributeValue, "")})
+CREATE (n)-[:HAS_ATTRIBUTE]->(a)
+
+:auto USING PERIODIC COMMIT
+LOAD CSV WITH HEADERS FROM 'file:///nodeParent.csv' AS line
+MATCH (n:Node{nodeId: line.NodeId}), (p:Node{nodeId: line.ParentNodeId})
+CREATE (p)-[:HAS_CHILD]->(n)
